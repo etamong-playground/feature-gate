@@ -3,10 +3,10 @@
  *
  * Gate effective dates are calendar days, so they must be compared against
  * the calendar day in the service's jurisdiction — not UTC, which can be a
- * day off for KST users near midnight.
+ * day off for users near midnight in a positive UTC offset.
  *
- * Mirror of @etamong-lab/legal `todayISO()`. Kept here to avoid a downward
- * dependency (legal depends on feature-gate, not the other way around).
+ * Shipped here (rather than pulled from a date library) so the package keeps
+ * zero runtime dependencies.
  */
 export function todayISO(timeZone = "Asia/Seoul"): string {
   return new Intl.DateTimeFormat("en-CA", {

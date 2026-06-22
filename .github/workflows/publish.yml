@@ -1,0 +1,60 @@
+name: publish
+
+# Publish the package to the host's npm registry on a version tag. The repo's
+# package.json carries the @etamong-playground name; the scope GitHub Packages
+# requires. workflow_dispatch with a `tag` input backfills already-existing
+# tags that predate this workflow.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'existing tag to (re)publish, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable && corepack prepare pnpm@10 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: publish to the host's package registry
+        env:
+          # GitHub: the built-in GITHUB_TOKEN can publish to GitHub Packages.
+          # Forgejo: the built-in token CANNOT publish packages, so an org-level
+          # Actions secret (Vault homelab/apps/forgejo/npm-publish) is used.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: |
+          set -eu
+          PKG="@etamong-playground/$(basename "$GITHUB_REPOSITORY")"
+          npm pkg set name="$PKG"
+          npm pkg delete publishConfig
+          # One file, both hosts: Forgejo Actions reads .github/workflows too.
+          # Detect by github.com (always set on GitHub); anything else is the
+          # Forgejo instance (its GITHUB_SERVER_URL is the internal service url).
+          echo "GITHUB_SERVER_URL=${GITHUB_SERVER_URL:-<unset>}"
+          case "${GITHUB_SERVER_URL:-}" in
+            *github.com*)
+              REG="https://npm.pkg.github.com/"; HOST="npm.pkg.github.com"; TOKEN="$GH_TOKEN" ;;
+            *)
+              REG="https://git.m.etamong.com/api/packages/etamong-playground/npm/"
+              HOST="git.m.etamong.com/api/packages/etamong-playground/npm"; TOKEN="$FORGEJO_TOKEN" ;;
+          esac
+          test -n "$TOKEN" || { echo "no publish token for this host"; exit 1; }
+          printf '@etamong-playground:registry=%s\n//%s/:_authToken=%s\n' "$REG" "$HOST" "$TOKEN" > .npmrc
+          echo "publishing $PKG to $REG"
+          npm publish --registry="$REG"

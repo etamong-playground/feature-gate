@@ -33,8 +33,8 @@ export interface ReleaseGateConfig {
   effectiveDate: string;
   /**
    * Optional kind tag for domain-specific extensions. Core ignores it; a
-   * consumer (e.g. @etamong-lab/legal) may set `kind: "policy"` to mark
-   * gates that carry additional domain semantics. Library stays kind-blind.
+   * consumer may set `kind: "policy"` (or any string) to mark gates that
+   * carry additional domain semantics. The library stays kind-blind.
    */
   kind?: string;
 }
@@ -75,7 +75,7 @@ export interface GateOverrideStore {
 export interface GateSuspect {
   gateKey: string;
   gateMode: GateMode;
-  /** Domain extension (e.g. "policy" from @etamong-lab/legal). */
+  /** Domain extension set by a consumer (e.g. "policy"). */
   gateKind?: string;
   strict: boolean;
   /** ISO-8601 timestamp of detection. */

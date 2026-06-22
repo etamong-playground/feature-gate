@@ -1,0 +1,32 @@
+{
+  "name": "@etamong-lab/feature-gate",
+  "version": "0.1.0",
+  "description": "Transport-agnostic feature gate primitives — release (monotonic time-window) and flag (operator-toggle) modes, with handler/validator extension points for detection pipelines.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "@etamong-lab:registry": "https://gitlab.com/api/v4/projects/83654677/packages/npm/"
+  },
+  "license": "UNLICENSED"
+}

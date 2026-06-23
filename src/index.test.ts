@@ -8,6 +8,7 @@ import {
   listGates,
   registerGateValidator,
   registerStrictHandler,
+  releaseGateOpen,
   runAllValidators,
   type GateSuspect,
 } from "./index";
@@ -60,6 +61,23 @@ describe("isGateOpen — flag mode", () => {
 describe("isGateOpen — fails closed", () => {
   it("returns false for an undeclared gate", async () => {
     expect(await isGateOpen("nope")).toBe(false);
+  });
+});
+
+describe("releaseGateOpen — synchronous release check", () => {
+  it("matches isGateOpen for a release gate (closed before, open on/after)", () => {
+    declareGate({ key: "r", mode: "release", strict: false, effectiveDate: "2026-07-15" });
+    expect(releaseGateOpen("r", { now: "2026-07-14" })).toBe(false);
+    expect(releaseGateOpen("r", { now: "2026-07-15" })).toBe(true);
+  });
+
+  it("fails closed for an undeclared gate", () => {
+    expect(releaseGateOpen("nope")).toBe(false);
+  });
+
+  it("throws for a flag-mode gate (no synchronous answer)", () => {
+    declareGate({ key: "f", mode: "flag", strict: false, defaultOpen: true });
+    expect(() => releaseGateOpen("f")).toThrow(/not "release"/);
   });
 });
 

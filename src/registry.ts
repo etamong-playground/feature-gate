@@ -80,6 +80,29 @@ export async function isGateOpen(
 }
 
 /**
+ * Synchronous open-check for **release** gates only.
+ *
+ * Release gates are pure calendar-date math (`now >= effectiveDate`), so they
+ * can be resolved in a synchronous context — a React render, a template, any
+ * place an `await` is awkward — without the Promise that `isGateOpen` returns.
+ *
+ * Fails closed (returns false) when the key is undeclared, same as `isGateOpen`.
+ * Throws for a flag-mode gate: flag resolution may consult an async override
+ * store, so it has no correct synchronous answer — use `isGateOpen` there.
+ */
+export function releaseGateOpen(key: string, ctx: { now?: string } = {}): boolean {
+  const config = gates.get(key);
+  if (!config) return false;
+  if (config.mode !== "release") {
+    throw new Error(
+      `releaseGateOpen: gate "${key}" is mode "${config.mode}", not "release" — use the async isGateOpen`,
+    );
+  }
+  const now = ctx.now ?? todayISO();
+  return now >= config.effectiveDate;
+}
+
+/**
  * Run every registered validator and concatenate the suspects.
  *
  * Validators are pure detection — they return suspects without side

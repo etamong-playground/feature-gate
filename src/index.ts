@@ -19,6 +19,7 @@ export {
   registerStrictHandler,
   registerGateValidator,
   isGateOpen,
+  releaseGateOpen,
   runAllValidators,
   classify,
   __resetForTest,

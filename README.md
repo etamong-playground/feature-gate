@@ -92,7 +92,8 @@ if (await isGateOpen("checkout.new-flow")) {
 | Export | Purpose |
 |---|---|
 | `declareGate(config)` | Register a gate at boot (throws on a duplicate key) |
-| `isGateOpen(key, ctx?)` | Resolve open/closed (release: time-based; flag: override + default) |
+| `isGateOpen(key, ctx?)` | Resolve open/closed, async (release: time-based; flag: override + default) |
+| `releaseGateOpen(key, ctx?)` | **Synchronous** open-check for release gates (e.g. a React render); throws for flag mode |
 | `registerStrictHandler(fn)` | Attach a routing classifier — pure, no side effects |
 | `registerGateValidator(fn)` | Attach a detection validator — returns `GateSuspect[]` |
 | `runAllValidators()` | Run every validator, concatenate results |

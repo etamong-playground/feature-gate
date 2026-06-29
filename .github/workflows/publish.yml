@@ -1,60 +1,82 @@
-name: publish
+name: Publish
 
-# Publish the package to the host's npm registry on a version tag. The repo's
-# package.json carries the @etamong-playground name; the scope GitHub Packages
-# requires. workflow_dispatch with a `tag` input backfills already-existing
-# tags that predate this workflow.
+# Publish @etamong-playground/feature-gate on a version tag.
+# Canonical registry = public npmjs.com via GitHub Actions OIDC Trusted
+# Publishing (token-less, provenance-attested). GitHub Packages is kept as a
+# mirror. The dead Forgejo publish path was removed with the rest of the
+# GitLab/Forgejo runner decommission.
+#
+# One-time npmjs setup (operator): configure a Trusted Publisher for
+# `@etamong-playground/feature-gate` on npmjs.com (repo etamong-playground/
+# feature-gate, this workflow) so the OIDC publish below is authorized — same
+# as @etamong-playground/{ui,i18n,legal}.
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'existing tag to (re)publish, e.g. v0.1.0'
-        required: true
-
-permissions:
-  contents: read
-  packages: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # npmjs OIDC Trusted Publishing (provenance)
+
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          version: 10.12.4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - run: corepack enable && corepack prepare pnpm@10 --activate
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - name: publish to the host's package registry
-        env:
-          # GitHub: the built-in GITHUB_TOKEN can publish to GitHub Packages.
-          # Forgejo: the built-in token CANNOT publish packages, so an org-level
-          # Actions secret (Vault homelab/apps/forgejo/npm-publish) is used.
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORGEJO_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Ensure npm >= 11.5.1
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check tag matches package.json version
+        if: github.event_name == 'push'
         run: |
-          set -eu
-          PKG="@etamong-playground/$(basename "$GITHUB_REPOSITORY")"
-          npm pkg set name="$PKG"
-          npm pkg delete publishConfig
-          # One file, both hosts: Forgejo Actions reads .github/workflows too.
-          # Detect by github.com (always set on GitHub); anything else is the
-          # Forgejo instance (its GITHUB_SERVER_URL is the internal service url).
-          echo "GITHUB_SERVER_URL=${GITHUB_SERVER_URL:-<unset>}"
-          case "${GITHUB_SERVER_URL:-}" in
-            *github.com*)
-              REG="https://npm.pkg.github.com/"; HOST="npm.pkg.github.com"; TOKEN="$GH_TOKEN" ;;
-            *)
-              REG="https://git.m.etamong.com/api/packages/etamong-playground/npm/"
-              HOST="git.m.etamong.com/api/packages/etamong-playground/npm"; TOKEN="$FORGEJO_TOKEN" ;;
-          esac
-          test -n "$TOKEN" || { echo "no publish token for this host"; exit 1; }
-          printf '@etamong-playground:registry=%s\n//%s/:_authToken=%s\n' "$REG" "$HOST" "$TOKEN" > .npmrc
-          echo "publishing $PKG to $REG"
-          npm publish --registry="$REG"
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $TAG_VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "Version check passed: $TAG_VERSION"
+
+      # ── Publish to GitHub Packages (mirror) ─────────────────────────────
+      # Built-in GITHUB_TOKEN (permissions: packages: write) — no Vault needed.
+      # Runs FIRST so the mirror keeps working through the transition: until the
+      # npmjs Trusted Publisher for this package is configured, the npmjs step
+      # below fails, but GitHub Packages (which current consumers still use) has
+      # already published. Reorder npmjs-first once npmjs is the sole registry.
+      - name: Publish to GitHub Packages (@etamong-playground/feature-gate)
+        run: |
+          printf '//npm.pkg.github.com/:_authToken=%s\n' "$GITHUB_TOKEN" > .npmrc
+          npm publish --access public --registry https://npm.pkg.github.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Publish to npmjs.com ────────────────────────────────────────────
+      - name: Publish to npmjs (OIDC trusted publishing)
+        run: |
+          # Token-less OIDC: id-token: write + the npmjs Trusted Publisher. Do NOT use
+          # setup-node registry-url here (it injects a placeholder NODE_AUTH_TOKEN that
+          # overrides OIDC). Clear any stray npmrc; npm uses OIDC against the default
+          # registry (registry.npmjs.org) and auto-attaches provenance.
+          rm -f .npmrc
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          npm publish --access public

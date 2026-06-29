@@ -1,6 +1,6 @@
 {
   "name": "@etamong-playground/feature-gate",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Transport-agnostic feature gate primitives — release (monotonic time-window) and flag (operator-toggle) modes, with handler/validator extension points for detection pipelines.",
   "keywords": [
     "feature-flag",

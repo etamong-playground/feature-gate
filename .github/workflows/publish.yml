@@ -57,6 +57,19 @@ jobs:
           fi
           echo "Version check passed: $TAG_VERSION"
 
+      # ── Publish to GitHub Packages (mirror) ─────────────────────────────
+      # Built-in GITHUB_TOKEN (permissions: packages: write) — no Vault needed.
+      # Runs FIRST so the mirror keeps working through the transition: until the
+      # npmjs Trusted Publisher for this package is configured, the npmjs step
+      # below fails, but GitHub Packages (which current consumers still use) has
+      # already published. Reorder npmjs-first once npmjs is the sole registry.
+      - name: Publish to GitHub Packages (@etamong-playground/feature-gate)
+        run: |
+          printf '//npm.pkg.github.com/:_authToken=%s\n' "$GITHUB_TOKEN" > .npmrc
+          npm publish --access public --registry https://npm.pkg.github.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # ── Publish to npmjs.com ────────────────────────────────────────────
       - name: Publish to npmjs (OIDC trusted publishing)
         run: |
@@ -67,12 +80,3 @@ jobs:
           rm -f .npmrc
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
           npm publish --access public
-
-      # ── Publish to GitHub Packages (mirror) ─────────────────────────────
-      # Built-in GITHUB_TOKEN (permissions: packages: write) — no Vault needed.
-      - name: Publish to GitHub Packages (@etamong-playground/feature-gate)
-        run: |
-          printf '//npm.pkg.github.com/:_authToken=%s\n' "$GITHUB_TOKEN" > .npmrc
-          npm publish --access public --registry https://npm.pkg.github.com
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

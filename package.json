@@ -27,6 +27,9 @@
     "type": "git",
     "url": "git+https://github.com/etamong-playground/feature-gate.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
